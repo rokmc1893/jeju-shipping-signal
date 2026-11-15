@@ -1,0 +1,97 @@
+# 제주데이터허브 Open API 데이터셋 레지스트리
+# dataKey 는 jejudatahub.net/data/list 의 공개 메타데이터에서 확인한 값 (프로젝트 키 아님 — 프로젝트 키는 .env 의 JEJU_HUB_PROJECT_KEY)
+#
+# 호출 URL 패턴(기본값, .env 의 JEJU_HUB_BASE_URL 로 변경 가능):
+#   {base_url}/{dataKey}/{projectKey}?param=value
+# ※ D-11 check_api.py 로 실제 패턴·응답 구조를 검증한 뒤 확정한다.
+
+datasets:
+  daily_stats:
+    id: 1361
+    title: 농산물 품종별 일일 거래 통계
+    data_key: 13t6aat1at6166111Dtt1taa1ta1661t
+    granularity: range            # startDate/endDate 범위 조회
+    date_format: "%Y%m%d"
+    quota_per_day: 3000
+    request:
+      required: [startDate, endDate, cultivar]
+    response:
+      date: baseDate
+      cultivar: cultivar
+      price: averagePrice           # 원/kg
+      volume: transactionVolume     # 톤
+      amount: transactionAmount     # 백만원
+    notes: 원천 aT 도매유통정보시스템. 전국 공영도매시장 기준, 산지 구분 없음. 휴장일은 0/0/0 으로 기록됨 → NULL 처리.
+
+  daily_trades:
+    id: 1362
+    title: 농산물 품종별 일일 거래 정보
+    data_key: 1tb1t233D16Da1b3333tttb266ba11D3
+    granularity: range
+    date_format: "%Y%m%d"
+    quota_per_day: 3000
+    request:
+      required: [startDate, endDate, cultivar]
+    response:
+      date: baseDate
+      cultivar: cultivar
+      market: wholesaleMarket
+      corporation: corporation
+      price: wholesalePrice         # 원/kg
+      volume: transactionVolume     # 톤
+      amount: transactionAmount     # 백만원
+    notes: 시장별·법인별 분해. market_compare 도구의 원천.
+
+  moving_average:
+    id: 1360
+    title: 농산물 품종별 거래 이동평균
+    data_key: 0106aa36D6363Da1ttaatat3t3031a1a
+    granularity: range
+    date_format: "%Y%m%d"
+    quota_per_day: 3000
+    request:
+      required: [startDate, endDate, cultivar, period]
+    response:
+      date: baseDate
+      cultivar: cultivar
+      price_ma: priceMovingAverage
+      volume_ma: volumeMovingAverage
+      amount_ma: amountMovingAverage
+    use: false
+    notes: 휴장일 0값이 이동평균에 섞여 들어갈 가능성이 있어 사용하지 않고 자체 계산(거래일 기준)한다. 기획서에 사유 명시.
+
+  weather_daily:
+    id: 579
+    title: 일별 기상 정보
+    data_key: 1aD5taat1attaa51Db1511b51ab9Da19
+    granularity: day              # searchDate 하루씩만 조회
+    date_format: "%Y%m%d"
+    quota_per_day: 1000
+    request:
+      required: [searchDate]
+      optional: [observatoryName]
+    response:
+      date: baseDate
+      station: observatoryName
+      temp_avg: averageTemperature
+      temp_min: lowestTemperature
+      temp_max: highestTemperature
+      rain: dailyRainfall
+      wind_max: maximumWindSpeed
+      wind_avg: averageWindSpeed
+    notes: 하루 1콜. 2년치 ≈ 730콜 → 쿼터 내. 최초 적재 후 증분만.
+
+  weather_stations:
+    id: 578
+    title: 기상관측소 정보
+    data_key: t1bab75a555a15715btaa7a5abaa1aab
+    granularity: static
+    request:
+      required: []
+    notes: 산지-관측소 매핑 검증용.
+
+  # 참고용(핵심 아님) — 2015~2020 정적. 기획서 배경 설명에만 사용.
+  fruit_production:
+    id: 899
+    title: 제주 품종별 과수 생산량 통계
+    use: false

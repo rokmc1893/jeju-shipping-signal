@@ -1,0 +1,100 @@
+# 품목 레지스트리 — 제주 월동채소
+# cultivars: 2026-11-15 허브 응용서비스 드롭다운 + Open API 실호출로 확정한 품종 문자열 (verified: true)
+# station: 산지 대표 기상관측소 (일별 기상 정보 API observatoryName). 관측소 필터 없이 호출하면 10곳만 와서
+#          중문·산천단·대흘·추자도·우도·마라도·유수암·선흘·서광·어리목 만 '무료'로 얻어짐 → 서광은 필터 불필요.
+# unit: 농가 거래 단위 환산(원/kg → 단위당). verify=true 는 aT 규격 확인 후 확정.
+# jeju_share: 겨울철 전국 도매시장에서 제주 물량 비중 등급 → 화면 각주 문구 결정.
+
+items:
+  carrot:
+    name: 당근
+    aliases: [당근, 구좌당근, 겨울당근]
+    cultivars:
+      default: "당근(일반)"
+      all: ["당근(일반)", "흙당근", "세척당근"]
+      verified: true
+    station: { primary: 구좌, fallback: [선흘, 대흘] }
+    unit: { label: 상자, kg: 20, verify: false }
+    jeju_share: high
+    season_months: [11, 12, 1, 2, 3]
+    region: 구좌
+
+  radish:
+    name: 무
+    aliases: [무, 월동무, 겨울무, 무우]
+    cultivars:
+      default: "월동무"
+      all: ["월동무", "세척무"]
+      verified: true
+    station: { primary: 성산, fallback: [구좌, 선흘] }
+    unit: { label: 상자, kg: 20, verify: false }
+    jeju_share: high
+    season_months: [11, 12, 1, 2, 3, 4]
+    region: 성산
+
+  cabbage:
+    name: 양배추
+    aliases: [양배추, 캐비지]
+    cultivars:
+      default: "양배추(일반)"
+      all: ["양배추(일반)", "저장양배추"]
+      verified: true
+    station: { primary: 한림, fallback: [유수암, 서광] }
+    unit: { label: 망, kg: 8, verify: false }
+    jeju_share: high
+    season_months: [12, 1, 2, 3, 4]
+    region: 애월·한림
+
+  garlic:
+    name: 마늘
+    aliases: [마늘, 깐마늘, 대정마늘]
+    cultivars:
+      default: "깐마늘"
+      all: ["깐마늘", "마늘", "햇마늘 남도", "저장형 남도", "저장형 난지"]
+      verified: true
+    station: { primary: 서광, fallback: [중문] }
+    unit: { label: kg, kg: 1, verify: true }
+    jeju_share: mid
+    season_months: [5, 6, 7]
+    region: 대정
+
+  onion:
+    name: 양파
+    aliases: [양파, 조생양파]
+    cultivars:
+      default: "조생양파"
+      all: ["조생양파", "중만생양파", "만생양파", "저장양파"]
+      verified: true
+    station: { primary: 서광, fallback: [중문] }
+    unit: { label: 망, kg: 15, verify: false }
+    jeju_share: mid     # 조생양파는 제주·전남 중심 → 참고 등급 상향
+    season_months: [3, 4, 5]
+    region: 대정
+
+share_footnote:
+  high: "전국 시세를 참고해 주세요. 산지별 가격과 실제 농가 수취가는 이 자료로 확인할 수 없어요."
+  mid: "전국 시세예요. 제주산 비중이 일부라 참고용으로 보세요."
+  low: "전국 시세예요. 제주산 비중이 낮아 참고용으로만 보세요."
+
+# 판단 규칙 파라미터 (judge.py) — 화면 '왜 이 색?' 에 그대로 노출
+rules:
+  ma_short_days: 7           # 거래일 기준
+  ma_long_days: 30           # 거래일 기준
+  trend_threshold_pct: 1.0   # 7일 평균 변화율 ±1% 이내면 보합
+  yoy_window_days: 3         # 작년 동기 ±3일 창
+  min_trading_days_high: 20  # 최근 30 거래일 중 확보 일수 → 신뢰도
+  min_trading_days_mid: 10
+  volume_spike_ratio: 1.5    # 당일 거래량 / 30거래일 평균 → 출하 집중 경고
+  cold_day_temp_min: 0.0     # 최저기온 ≤ 0℃ → 한파일
+  rain_day_mm: 10.0          # 일강수량 ≥ 10mm → 우천일
+  weather_after_days: 3      # 기상 이벤트 후 N 거래일 가격 평균
+  weather_min_events: 3      # 이벤트 N회 미만이면 '자료 부족'
+  # 거래 정보(1362)는 하루 10행 한도로 표본만 받을 수 있어 시장 비교를 기본 비활성화 (한계로 명시)
+  market_compare_enabled: false
+
+# 수집 설정 (scripts/collect.py)
+collect:
+  years: 2
+  weather_months: [10, 11, 12, 1, 2, 3, 4]   # 기상은 출하기 전후만 수집해 일 쿼터(1000) 절약
+  weather_daily_budget: 900                 # 하루 최대 기상 호출 수 (초과분은 다음 실행에서 이어받음)
+  weather_free_stations: [중문, 산천단, 대흘, 추자도, 우도, 마라도, 유수암, 선흘, 서광, 어리목]
