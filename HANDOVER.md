@@ -1,3 +1,9 @@
+# Claude 작업 재개 인계 · 2026-11-16
+
+사용자가 Codex 토큰 부족으로 Claude에서 작업을 이어간다. 먼저 [docs/CLAUDE_HANDOFF.md](docs/CLAUDE_HANDOFF.md)를 읽는다. 실제 저장소 경로·사용자 제약·실행 환경·검증 결과·다음 작업 순서를 정리했다.
+
+---
+
 # 모바일 앱 작업 · 2026-11-16
 
 - 사용자 요청: 갤럭시 크기의 실제 Android 에뮬레이터를 보면서 개발한다. iOS·Android UI를 공유하며 개인 Google·Chrome 계정 정보를 앱 사용자에게 노출하지 않는다.
