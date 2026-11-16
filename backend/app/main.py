@@ -19,7 +19,8 @@ from .agent import Agent, AgentRequest
 from .data_store import DataStore
 
 app = FastAPI(title="출하 신호등 — 제주 월동채소 편", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+app.add_middleware(CORSMiddleware, allow_origins=["http://localhost:5173", "http://127.0.0.1:5173",
+                                                "https://localhost", "capacitor://localhost"],
                    allow_methods=["*"], allow_headers=["*"])
 
 _store = DataStore()

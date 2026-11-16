@@ -13,3 +13,12 @@ outputs/
 
 # 개발 화면 캡처는 공개 저장소에 포함하지 않는다.
 docs/images/
+.playwright-cli/
+.playwright/
+output/
+
+# 개인 서명 키·계정 설정은 앱 소스에 포함하지 않는다.
+*.jks
+*.keystore
+google-services.json
+GoogleService-Info.plist

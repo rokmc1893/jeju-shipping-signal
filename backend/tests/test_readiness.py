@@ -118,3 +118,24 @@ def test_demo_refuses_existing_real_cache(store, monkeypatch):
     assert demo.main() == 1
     assert store.path("daily_stats").read_bytes() == before
     assert not (store.root / "SYNTHETIC").exists()
+
+
+@pytest.mark.parametrize("origin", ["https://localhost", "capacitor://localhost"])
+def test_native_app_origin_can_query_api(client, origin):
+    response = client.options("/api/ask", headers={
+        "Origin": origin,
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "content-type",
+    })
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == origin
+    assert "access-control-allow-credentials" not in response.headers
+
+
+def test_untrusted_origin_is_rejected(client):
+    response = client.options("/api/ask", headers={
+        "Origin": "https://untrusted.example",
+        "Access-Control-Request-Method": "POST",
+    })
+    assert response.status_code == 400
+    assert "access-control-allow-origin" not in response.headers

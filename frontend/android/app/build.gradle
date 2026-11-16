@@ -1,0 +1,66 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "io.github.rokmc1893.jejusignal"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "io.github.rokmc1893.jejusignal"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+
+// 로컬 개발 서버를 연결한 디버그 설정으로 배포하지 못하게 막는다.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name.toLowerCase().contains('release') }) {
+        def configuration = file('src/main/assets/capacitor.config.json')
+        if (!configuration.exists()) {
+            throw new GradleException('먼저 npm run android:sync를 실행하세요.')
+        }
+        def config = new groovy.json.JsonSlurper().parse(configuration)
+        if (config.server?.url) {
+            throw new GradleException('개발 서버 URL이 들어 있는 앱은 배포할 수 없습니다. 기본 설정으로 다시 sync하세요.')
+        }
+        def metadataFile = file('src/main/assets/public/mobile-build.json')
+        def bundledApi = metadataFile.exists() ? new groovy.json.JsonSlurper().parse(metadataFile).apiBaseUrl : ''
+        def expectedApi = (System.getenv('VITE_API_BASE_URL') ?: '').replaceAll('/$', '')
+        if (!bundledApi?.startsWith('https://') || bundledApi != expectedApi) {
+            throw new GradleException('배포용 HTTPS API 서버를 먼저 설정하세요. docs/MOBILE.md를 참조하세요.')
+        }
+    }
+}
