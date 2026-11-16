@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { ask, fetchHealth, fetchItems } from "./api";
 import { MarketPanel, VolumePanel, WeatherPanel } from "./components/Panels";
 import { PriceChart } from "./components/PriceChart";
@@ -29,6 +30,16 @@ export default function App() {
   const [listening, setListening] = useState(false);
   const idleTimer = useRef<number | null>(null);
   const stopListen = useRef<(() => void) | null>(null);
+  const requestId = useRef(0);
+  const resultElement = useRef<HTMLElement | null>(null);
+  const scrollToResult = useRef(false);
+
+  useEffect(() => {
+    if (!res || !scrollToResult.current || !window.matchMedia("(max-width: 860px)").matches) return;
+    scrollToResult.current = false;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    resultElement.current?.scrollIntoView({ behavior: reducedMotion ? "instant" : "smooth", block: "start" });
+  }, [res]);
 
   useEffect(() => {
     fetchHealth().then((health) => setSynthetic(health.synthetic)).catch(() => {});
@@ -50,10 +61,14 @@ export default function App() {
     const reset = () => {
       if (idleTimer.current) window.clearTimeout(idleTimer.current);
       idleTimer.current = window.setTimeout(() => {
+        requestId.current += 1;
+        setLoading(false);
         setRes(null);
         setSelected(null);
         setQuestion("");
         stopSpeaking();
+        stopListen.current?.();
+        setListening(false);
       }, KIOSK_RESET_MS);
     };
     reset();
@@ -66,16 +81,20 @@ export default function App() {
   }, [kiosk]);
 
   const run = useCallback(async (params: Parameters<typeof ask>[0]) => {
+    const id = ++requestId.current;
     setLoading(true);
     setError(null);
     try {
       const r = await ask(params);
+      if (id !== requestId.current) return;
+      scrollToResult.current = !params.intents?.includes("volume") && !r.tools.my_volume;
       setRes(r);
       if (r.item) setSelected(r.item);
     } catch (e) {
+      if (id !== requestId.current) return;
       setError(e instanceof Error ? e.message : "알 수 없는 오류가 났어요.");
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   }, []);
 
@@ -104,6 +123,7 @@ export default function App() {
         submitQuestion(t);
       },
       () => setListening(false),
+      setError,
     );
     if (stop) {
       stopListen.current = stop;
@@ -115,6 +135,19 @@ export default function App() {
     if (!res) return;
     const text = [res.headline, ...res.bullets, ...res.extra_sentences].filter(Boolean).join(" ");
     if (!speak(text)) setError("이 브라우저에서는 읽어주기를 지원하지 않아요.");
+  };
+
+  const printResult = () => {
+    if (Capacitor.isNativePlatform()) {
+      setError("앱에서는 바로 인쇄할 수 없어요. 컴퓨터에서 같은 자료를 열어 인쇄해 주세요.");
+      return;
+    }
+    try {
+      if (typeof window.print !== "function") throw new Error();
+      window.print();
+    } catch {
+      setError("이 기기에서는 바로 인쇄할 수 없어요. 컴퓨터에서 같은 자료를 열어 인쇄해 주세요.");
+    }
   };
 
   const item = items.find((i) => i.key === (res?.item ?? selected));
@@ -132,7 +165,7 @@ export default function App() {
         <button className="toggle" onClick={readAloud} disabled={!res?.ok}>
           읽어주기
         </button>
-        <button className="toggle" onClick={() => window.print()} disabled={!res?.ok}>
+        <button className="toggle" onClick={printResult} disabled={!res?.ok}>
           인쇄
         </button>
         <button className="toggle" aria-pressed={kiosk} onClick={() => setKiosk((v) => !v)}>
@@ -177,10 +210,10 @@ export default function App() {
           </div>
         </aside>
 
-        <section className="result" aria-busy={loading}>
-          {error && <div className="error">{error}</div>}
+        <section className="result" aria-busy={loading} ref={resultElement}>
+          {error && <div className="error" role="alert">{error}</div>}
 
-          {!res && !loading && <div className="empty">왼쪽에서 작물을 누르면 오늘 시세와 신호를 보여드려요.</div>}
+          {!res && !loading && <div className="empty">작물을 고르면 최근 시세와 신호를 보여드려요.</div>}
           {loading && <div className="empty">살펴보는 중…</div>}
 
           {res && !res.ok && res.clarify.length > 0 && (

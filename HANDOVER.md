@@ -1,3 +1,17 @@
+# 모바일 앱 작업 · 2026-11-16
+
+- 사용자 요청: 갤럭시 크기의 실제 Android 에뮬레이터를 보면서 개발한다. iOS·Android UI를 공유하며 개인 Google·Chrome 계정 정보를 앱 사용자에게 노출하지 않는다.
+- Capacitor 8.6.2 Android/iOS 프로젝트, 모바일 safe area·터치·큰 글씨·응답 순서 보호·음성 오류 처리를 추가했다. 앱에서는 음성 인식을 숨기고 인쇄 안내를 제공한다.
+- 전용 AVD `Jeju_Galaxy_S24`, Android 16, 1080×2340·480dpi다. 앱 ID `io.github.rokmc1893.jejusignal`을 설치했다. 실제 삼성 OS는 아니다.
+- `start_mobile.command`와 `scripts/mobile_dev.py`가 로컬 서버·에뮬레이터·빌드·설치를 연결한다. 백엔드 8000, Vite 5173, adb reverse를 사용한다. `.env`와 기본 실데이터 캐시는 변경하지 않는다.
+- Android APK 빌드·설치·별도 앱 실행, iOS generic simulator 빌드, pytest37·웹 빌드·npm audit 0개를 확인했다. Chromium/WebKit 모바일 화면·입력·쿠키 제외도 검사했다.
+- 기본 실데이터 수집·5품목 E2E, iOS 실행 런타임·앱 실행, 삼성 실기기·음성·배포 검증은 남았다. 개발 APK는 타인에게 배포하지 않는다.
+- 코드 리뷰 서브에이전트가 native CORS·인쇄 no-op·release API 메타데이터 검증 문제를 지적했고 수정했다. 최종 재검토에서 새로 보고할 미해결 P0/P1/P2 결함은 없었다. 리뷰는 소스·diff를 읽는 방식이며 실제 빌드는 본 작업에서 별도로 확인했다.
+- 개발 사진은 저장소에 올리지 않는다. 확인용 캡처·개발 로그·개인 서명 키·SDK 로컬 경로·native 빌드 결과는 git에서 제외한다.
+- 상세 실행법과 현재 제한은 [docs/MOBILE.md](docs/MOBILE.md)에 있다.
+
+---
+
 # 저장소 재생성 · 2026-11-16
 
 사용자 요청으로 기존 GitHub 저장소를 삭제하고 같은 이름으로 다시 생성한다. 이전 작성자·공동 작성자 이력을 게시하지 않고 유소민 계정의 새 커밋 하나로 시작한다. 이전 Git 이력과 저장소 설정·PR 정보는 로컬 `outputs/backups`에 보관하며 업로드하지 않는다.
