@@ -90,7 +90,7 @@ def test_weather_stops_empty_station_without_skipping_other_station(store, monke
 
     def call(key, **params):
         calls.append(params.get("observatoryName"))
-        return SimpleNamespace(rows=[])
+        return SimpleNamespace(rows=[], total=0, meta={"rows_found": True}, raw_keys=["data"])
 
     hub = SimpleNamespace(call=call)
     collector.collect_weather(hub, store, 1, date(2026, 1, 1), 1000)

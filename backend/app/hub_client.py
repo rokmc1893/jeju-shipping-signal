@@ -7,7 +7,9 @@
 """
 from __future__ import annotations
 
+import http.client
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -22,7 +24,9 @@ USER_AGENT = "JejuShippingSignal/0.1 (hackathon; local-agent)"
 
 
 class HubError(RuntimeError):
-    pass
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass
@@ -37,7 +41,25 @@ class HubResponse:
 
 
 def _mask(url: str, key: str) -> str:
-    return url.replace(key, key[:4] + "****" + key[-2:]) if key and len(key) > 8 else url
+    return url.replace(key, "****") if key else url
+
+
+def validate_response(response: HubResponse) -> None:
+    """거래·기상 공통 검증이다. HTTP 200 오류를 거래 없는 날로 저장하지 않는다."""
+    meta = response.meta
+    message = " ".join(str(meta.get(k, "")) for k in ("message", "msg", "error"))
+    failed = meta.get("success") is False or bool(meta.get("error"))
+    for key in ("resultCode", "errorCode", "status", "code", "result"):
+        value = meta.get(key)
+        if value is not None and str(value).strip().lower() not in ("0", "00", "0000", "200", "ok", "success", "true"):
+            failed = True
+    if re.search(r"초과|실패|오류|유효하지|인증|권한|quota|exceed|error|fail|unauthori|forbidden|invalid|limit", message, re.I):
+        failed = True
+    if message.strip() and not response.rows and not meta.get("rows_found") and "data" not in response.raw_keys:
+        failed = True
+    if failed or (not response.rows and response.total is None and not meta.get("rows_found")):
+        # 응답 본문은 키나 URL이 포함될 수 있으므로 오류 종류만 남긴다.
+        raise HubError("응답 형식이 예상과 다릅니다: 허브 오류 또는 정상 자료 목록이 없는 응답입니다.")
 
 
 def _find_rows(payload: Any) -> tuple[list[dict], int | None, dict]:
@@ -47,6 +69,8 @@ def _find_rows(payload: Any) -> tuple[list[dict], int | None, dict]:
         return [r for r in payload if isinstance(r, dict)], len(payload), meta
     if not isinstance(payload, dict):
         return [], None, meta
+    if payload.get("error"):
+        meta["error"] = True  # 구조화된 오류 객체도 정상 빈 목록으로 처리하지 않는다.
 
     total = None
     for k in ("totCnt", "totalCount", "total", "recordsTotal", "count"):
@@ -56,17 +80,18 @@ def _find_rows(payload: Any) -> tuple[list[dict], int | None, dict]:
                 break
             except ValueError:
                 pass
-    for k in ("result", "resultCode", "status", "message", "msg", "hasMore"):
+    for k in ("result", "resultCode", "status", "message", "msg", "hasMore", "success", "error", "errorCode", "code"):
         if k in payload and not isinstance(payload[k], (list, dict)):
             meta[k] = payload[k]
 
     for k in ("data", "list", "items", "rows", "result", "body"):
         v = payload.get(k)
         if isinstance(v, list):
+            meta["rows_found"] = True  # 행 목록 자체는 있었다(비어 있어도 정상 응답)
             return [r for r in v if isinstance(r, dict)], total, meta
         if isinstance(v, dict):
             rows, t2, m2 = _find_rows(v)
-            if rows or t2 is not None:
+            if rows or t2 is not None or m2.get("rows_found"):
                 meta.update(m2)
                 return rows, total if total is not None else t2, meta
     for v in payload.values():
@@ -84,7 +109,8 @@ class HubClient:
         self.timeout = timeout
         self.retries = retries
         self.sleep_between = sleep_between
-        self.calls = 0
+        self.calls = 0      # 성공한 호출 수
+        self.attempts = 0   # 실패·재시도를 포함해 허브로 실제 보낸 요청 수 → 하루 쿼터 계산은 이 값을 쓴다
         self.verbose = verbose
         if not self.project_key:
             raise HubError("JEJU_HUB_PROJECT_KEY 가 비어 있습니다. .env 를 확인하세요.")
@@ -102,6 +128,7 @@ class HubClient:
             t0 = time.time()
             try:
                 req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+                self.attempts += 1
                 with urllib.request.urlopen(req, timeout=self.timeout) as resp:
                     status = resp.status
                     body = resp.read().decode("utf-8", errors="replace")
@@ -112,19 +139,21 @@ class HubClient:
                 try:
                     payload = json.loads(body) if body.strip() else {}
                 except json.JSONDecodeError as e:
-                    raise HubError(f"JSON 파싱 실패 ({_mask(url, self.project_key)}): {body[:200]}") from e
+                    raise HubError(f"JSON 파싱 실패 ({_mask(url, self.project_key)})") from e
                 rows, total, meta = _find_rows(payload)
+                meta = {k: _mask(v, self.project_key) if isinstance(v, str) else v for k, v in meta.items()}
                 keys = list(payload.keys()) if isinstance(payload, dict) else ["<list>"]
                 if self.sleep_between:
                     time.sleep(self.sleep_between)
-                return HubResponse(rows, total, keys, _mask(url, self.project_key), status, elapsed, meta)
+                response = HubResponse(rows, total, keys, _mask(url, self.project_key), status, elapsed, meta)
+                validate_response(response)
+                return response
             except urllib.error.HTTPError as e:
-                detail = e.read().decode("utf-8", errors="replace")[:300] if e.fp else ""
-                last_err = HubError(f"HTTP {e.code} ({_mask(url, self.project_key)}) {detail}")
+                last_err = HubError(f"HTTP {e.code} ({_mask(url, self.project_key)})", status=e.code)
                 if e.code in (400, 401, 403, 404):
                     break  # 재시도 무의미
-            except (urllib.error.URLError, TimeoutError, OSError) as e:
-                last_err = HubError(f"네트워크 오류 ({_mask(url, self.project_key)}): {e}")
+            except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as e:
+                last_err = HubError(f"네트워크 오류 ({_mask(url, self.project_key)}): {type(e).__name__}")
                 if self.verbose:
                     print("x", end="", flush=True)
             time.sleep(1.5 * (attempt + 1))
@@ -156,8 +185,14 @@ class HubClient:
             rows.extend(self._fetch_window(ds, fmt, s, e, params))
         return rows
 
+    def fetch_window(self, dataset: str, start: date, end: date, **params: Any) -> list[dict]:
+        """창 하나만 조회한다. 수집기가 창 단위로 저장·실패 기록·재시도를 하려고 쓴다. 실패하면 HubError."""
+        ds = config.datasets()[dataset]
+        return self._fetch_window(ds, ds.get("date_format", "%Y%m%d"), start, end, params)
+
     def _fetch_window(self, ds: dict, fmt: str, s: date, e: date, params: dict) -> list[dict]:
         r = self.call(ds["data_key"], startDate=s.strftime(fmt), endDate=e.strftime(fmt), **params)
+        validate_response(r)
         truncated = r.meta.get("hasMore") is True or (r.total is not None and r.total > len(r.rows))
         if truncated and s < e:
             mid = s + (e - s) // 2

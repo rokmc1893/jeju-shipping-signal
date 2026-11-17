@@ -5,12 +5,17 @@
 - 휴장일 처리: price==0 AND volume==0 → 두 값 모두 NaN (거래 없음 ≠ 가격 0원). 이 규칙이 신호등 오판을 막는다.
 - CSV 캐시(데이터셋별 1파일). parquet 의존 없이 센터 PC 에서 동작. 증분 수집은 날짜 기준 upsert.
 - 모든 Tool 은 이 모듈의 DataFrame 만 본다 → 인터넷/허브가 끊겨도 같은 질문에 같은 답(재현성).
+- 저장은 같은 폴더의 임시 파일에 모두 쓴 뒤 os.replace 로 교체한다 → 쓰는 도중 중단돼도 기존 CSV 가 깨지지 않는다.
 """
 from __future__ import annotations
 
+import os
+import tempfile
+import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+from typing import IO, Callable
 
 import numpy as np
 import pandas as pd
@@ -18,6 +23,64 @@ import pandas as pd
 from . import config
 
 STD_NUMERIC = ("price", "volume", "amount", "temp_avg", "temp_min", "temp_max", "rain", "wind_max", "wind_avg")
+
+TMP_SUFFIX = ".tmp"
+REPLACE_ATTEMPTS = 5
+REPLACE_DELAY = 0.2
+
+
+def _replace(tmp: Path, dest: Path) -> None:
+    """os.replace 로 교체한다. Windows 는 다른 프로그램이 대상 파일을 잠깐 열고 있으면 PermissionError 를 내므로 몇 번 재시도한다."""
+    for attempt in range(REPLACE_ATTEMPTS):
+        try:
+            os.replace(tmp, dest)
+            return
+        except PermissionError:
+            if attempt == REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(REPLACE_DELAY * (attempt + 1))
+
+
+def atomic_write(dest: Path, writer: Callable[[IO[str]], None]) -> None:
+    """dest 를 통째로 안전하게 교체한다.
+
+    같은 폴더의 임시 파일에 쓰고 디스크까지 내려보낸 뒤(fsync) 교체한다. 쓰기·교체 중 어떤 예외가 나도
+    기존 dest 는 그대로 남고 임시 파일은 지운다. 강제 종료로 남은 임시 파일(.이름.*.tmp)은 조회에 쓰이지 않는다.
+    """
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(prefix=f".{dest.name}.", suffix=TMP_SUFFIX, dir=dest.parent)
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            writer(f)
+            f.flush()
+            os.fsync(f.fileno())
+        try:  # mkstemp 는 0600 으로 만든다 → 기존 파일 권한(없으면 일반 파일 기본값)에 맞춘다
+            os.chmod(tmp, (dest.stat().st_mode & 0o777) if dest.exists() else 0o644)
+        except OSError:
+            pass
+        _replace(tmp, dest)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+    try:  # 폴더 항목까지 디스크에 기록(POSIX). Windows 는 폴더를 열 수 없어 건너뛴다.
+        dir_fd = os.open(dest.parent, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(dir_fd)
+    except OSError:
+        pass
+    finally:
+        os.close(dir_fd)
+
+
+def atomic_write_text(dest: Path, text: str) -> None:
+    atomic_write(dest, lambda f: f.write(text))
 
 
 def normalize(rows: list[dict], dataset: str) -> pd.DataFrame:
@@ -79,7 +142,8 @@ class DataStore:
         return df
 
     def save(self, dataset: str, df: pd.DataFrame) -> None:
-        df.to_csv(self.path(dataset), index=False, encoding="utf-8")
+        """CSV 를 원자적으로 교체한다. 실패하면 기존 파일이 그대로 남는다."""
+        atomic_write(self.path(dataset), lambda f: df.to_csv(f, index=False))
 
     def upsert(self, dataset: str, new: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
         """키 기준 upsert (새 행이 우선)."""
