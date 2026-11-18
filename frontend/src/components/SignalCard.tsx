@@ -2,10 +2,9 @@ import type { AgentResponse } from "../types";
 
 const won = (v?: number | null) => (v == null ? "-" : `${Math.round(v).toLocaleString("ko-KR")}원`);
 
-export function SignalCard({ r, unitLabel, unitKg }: { r: AgentResponse; unitLabel: string; unitKg: number }) {
+export function SignalCard({ r }: { r: AgentResponse }) {
   const s = r.signal!;
   const p = r.tools.price_now;
-  const unitPrice = p?.ok && p.price_kg != null ? p.price_kg * unitKg : null;
   return (
     <section className="signal" aria-live="polite">
       <div className={`lamp ${s.color}`} role="img" aria-label={`신호: ${s.label}`}>
@@ -14,13 +13,13 @@ export function SignalCard({ r, unitLabel, unitKg }: { r: AgentResponse; unitLab
       <div>
         <h2>{r.headline}</h2>
         <div className="price">
-          {won(unitPrice)}
+          {won(p?.price_kg)}
           <small>
-            1{unitLabel} ({unitKg}kg)
+            / kg
           </small>
         </div>
         <div className="meta">
-          1kg {won(p?.price_kg)}
+          전국 도매가격
           {p?.dod_pct != null && ` · 전 거래일보다 ${p.dod_pct > 0 ? "+" : ""}${p.dod_pct}%`}
           {p?.date && ` · ${p.date} 거래 기준`}
         </div>

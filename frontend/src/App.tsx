@@ -180,7 +180,7 @@ export default function App() {
             {items.map((i) => (
               <button key={i.key} className="item-btn" aria-pressed={selected === i.key} disabled={!i.has_data} onClick={() => pickItem(i.key)}>
                 {i.name}
-                <small>{i.has_data ? `${i.region} · 1${i.unit.label} ${i.unit.kg}kg` : "자료 준비 중"}</small>
+                <small>{i.has_data ? `${i.region} · 원/kg` : "자료 준비 중"}</small>
               </button>
             ))}
           </nav>
@@ -239,7 +239,7 @@ export default function App() {
 
           {res?.ok && res.signal && item && (
             <>
-              <SignalCard r={res} unitLabel={item.unit.label} unitKg={item.unit.kg} />
+              <SignalCard r={res} />
               <ul className="bullets">
                 {res.bullets.map((b, i) => (
                   <li key={i}>{b}</li>

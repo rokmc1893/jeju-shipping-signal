@@ -147,7 +147,7 @@ class Agent:
         res: dict = {}
         res["price_now"] = tools.price_now(stats, asof)
         if res["price_now"].get("is_asof_closed"):
-            trace.append(f"기준일 휴장 → 마지막 거래일 {res['price_now']['date']} 기준으로 전환")
+            trace.append(f"기준일 가격 자료 없음 → 마지막 거래일 {res['price_now']['date']} 기준으로 전환")
         res["trend_ma"] = tools.trend_ma(stats, asof)
         res["yoy_compare"] = tools.yoy_compare(stats, asof)
         if "weather_effect" in plan:
@@ -157,6 +157,9 @@ class Agent:
         if "my_volume" in plan:
             res["my_volume"] = tools.my_volume(res["price_now"], res["trend_ma"], res["yoy_compare"],
                                                it.boxes or 0, cfg["unit"]["kg"], cfg["unit"]["label"])
+            if res["my_volume"].get("ok") and not cfg["unit"].get("verify"):
+                res["my_volume"]["note"] = (f"1{cfg['unit']['label']} {cfg['unit']['kg']}kg을 가정한 예시예요. "
+                                             + res["my_volume"]["note"])
         for k, v in res.items():
             if not v.get("ok"):
                 trace.append(f"{k}: {v.get('reason')}")
@@ -165,10 +168,14 @@ class Agent:
         trace.append(f"판단: {signal.color} (조건 {signal.score}/3, 신뢰도 {signal.confidence})")
 
         unit_price = None
-        if res["price_now"].get("ok"):
+        if res["price_now"].get("ok") and cfg["unit"].get("verify"):
             unit_price = res["price_now"]["price_kg"] * cfg["unit"]["kg"]
         head = templates.headline(cfg["name"], cfg["unit"]["label"], unit_price, signal)
+        if (state.days_since_last or 0) > config.MAX_PRICE_AGE_DAYS:
+            head = f"{cfg['name']}, 마지막 거래가 {state.days_since_last}일 전이라 판단을 보류해요."
         bl = templates.bullets(res["price_now"], res["trend_ma"], res["yoy_compare"], cfg["name"])
+        if not res["yoy_compare"].get("ok"):
+            bl.append(res["yoy_compare"]["reason"])
         extra = [s for s in (templates.weather_sentence(res.get("weather_effect", {})),
                              templates.market_sentence(res.get("market_compare", {}))) if s]
         if res.get("my_volume", {}).get("ok"):

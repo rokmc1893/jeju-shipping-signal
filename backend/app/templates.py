@@ -13,14 +13,14 @@ def headline(item_name: str, unit_label: str, unit_price: float | None, signal: 
             YELLOW: f"{item_name}, 조금 더 지켜보는 게 좋겠어요.",
             RED: f"{item_name}, 지금 출하는 조심하세요."}[signal.color]
     if unit_price is not None:
-        base += f" 오늘 1{unit_label} {won(unit_price)}쯤이에요."
+        base += f" 최근 거래일 1{unit_label} {won(unit_price)}쯤이에요."
     return base
 
 
 def bullets(price: dict, trend: dict, yoy: dict, item_name: str) -> list[str]:
     out: list[str] = []
     if price.get("ok"):
-        s = f"오늘 도매가는 1kg에 {won(price['price_kg'])}"
+        s = f"최근 거래일 도매가는 1kg에 {won(price['price_kg'])}"
         if price.get("dod_pct") is not None:
             s += f", 전 거래일보다 {price['dod_pct']:+.1f}%"
         out.append(s + "예요.")
@@ -66,7 +66,7 @@ def footnotes(item_cfg: dict, state: dict, share_note: str, unit_verified: bool)
     if state.get("first_date"):
         notes.append(f"자료 기간 {state['first_date']} ~ {state['last_trading_day']}, 거래일 {state['trading_days_total']}일. 휴장일은 계산에서 뺐어요.")
     if not unit_verified:
-        notes.append(f"1{item_cfg['unit']['label']} = {item_cfg['unit']['kg']}kg 기준 환산이에요. 거래 규격이 다르면 설정에서 바꿀 수 있어요.")
+        notes.append(f"1{item_cfg['unit']['label']} = {item_cfg['unit']['kg']}kg 기준 환산은 가정한 예시예요. 실제 포장 중량을 확인해 주세요.")
     notes.append("과거 거래 자료로 만든 참고 신호예요. 가격 예측이 아니며 출하 결정의 책임은 농가에 있어요.")
     return notes
 
