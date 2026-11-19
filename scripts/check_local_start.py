@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 from statistics import quantiles
 import subprocess
+import sys
 import tempfile
 import time
 from urllib.request import Request, urlopen
@@ -57,6 +58,8 @@ def stop(process: subprocess.Popen) -> None:
 
 
 def main() -> None:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=18767)
     parser.add_argument("--minutes", type=float, default=0)
