@@ -7,8 +7,7 @@ export function VolumePanel({ item, onCalc, result }: { item: Item; onCalc: (box
   const [boxes, setBoxes] = useState(() => result?.ok && result.boxes != null ? String(result.boxes) : "");
   const n = Number(boxes);
   return (
-    <section className="panel">
-      <h3>내 물량으로 계산</h3>
+    <div className="volume-panel">
       <div className="volume">
         <input type="number" inputMode="numeric" min={1} placeholder="0" value={boxes} onChange={(e) => setBoxes(e.target.value)} aria-label={`${item.unit.label} 수`} />
         <span>
@@ -34,7 +33,7 @@ export function VolumePanel({ item, onCalc, result }: { item: Item; onCalc: (box
           <p style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>{result.note}</p>
         </div>
       )}
-    </section>
+    </div>
   );
 }
 

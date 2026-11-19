@@ -16,10 +16,10 @@ export function PriceChart({ thisYear, lastYear }: { thisYear: SeriesPoint[]; la
     <div>
       <div className="legend">
         <span>
-          <i style={{ background: "#1e2a1c" }} />올해
+          <i className="legend-current" />올해
         </span>
         <span>
-          <i style={{ background: "#b8c2b0" }} />작년 같은 시기
+          <i className="legend-previous" />작년 같은 시기
         </span>
         <span>원/kg · 기간별 거래 순서로 나란히 표시</span>
       </div>
@@ -39,8 +39,8 @@ export function PriceChart({ thisYear, lastYear }: { thisYear: SeriesPoint[]; la
               ]}
               labelFormatter={(i) => `기간 내 ${Number(i) + 1}번째 거래일`}
             />
-            <Line type="monotone" dataKey="작년" stroke="#b8c2b0" strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
-            <Line type="monotone" dataKey="올해" stroke="#1e2a1c" strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />
+            <Line type="monotone" dataKey="작년" stroke="#537552" strokeDasharray="5 4" strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
+            <Line type="monotone" dataKey="올해" stroke="#0b5971" strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
