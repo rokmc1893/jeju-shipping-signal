@@ -9,6 +9,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = ROOT / "config"
+MAX_PRICE_AGE_DAYS = 7
 
 
 def _load_dotenv(path: Path) -> None:

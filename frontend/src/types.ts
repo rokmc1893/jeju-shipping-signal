@@ -12,6 +12,7 @@ export interface Signal {
   color: Color;
   label: string;
   score: number;
+  deferred?: boolean;
   conditions: Condition[];
   notes: string[];
   confidence: "high" | "mid" | "low" | "none";
@@ -41,6 +42,7 @@ export interface DataState {
   first_date: string | null;
   confidence: string;
   warnings: string[];
+  collection_incomplete?: boolean;
 }
 
 export interface AgentResponse {
@@ -59,6 +61,7 @@ export interface AgentResponse {
   data_state: DataState | null;
   footnotes: string[];
   clarify: { item: string; label: string }[];
+  intent?: { intents: IntentKey[]; boxes?: number | null };
   trace: string[];
 }
 
@@ -71,6 +74,7 @@ export interface Item {
   jeju_share: "high" | "mid" | "low";
   region: string;
   has_data: boolean;
+  collection_incomplete?: boolean;
 }
 
 export type IntentKey = "overview" | "price_now" | "trend" | "yoy" | "weather" | "market" | "volume";

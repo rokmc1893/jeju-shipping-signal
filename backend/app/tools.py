@@ -128,6 +128,9 @@ def yoy_compare(stats: pd.DataFrame, asof: date, window: int | None = None) -> d
     now = trading_days(stats, asof)
     if now.empty:
         return {"ok": False, "reason": "올해 거래 데이터가 없어요."}
+    age = (asof - now.iloc[-1]["date"]).days
+    if age > config.MAX_PRICE_AGE_DAYS:
+        return {"ok": False, "reason": f"마지막 거래 자료가 {age}일 전이라 기준일의 전년 비교를 보류해요."}
     cur_price = float(now.iloc[-1]["price"])
     try:
         ly_center = asof.replace(year=asof.year - 1)

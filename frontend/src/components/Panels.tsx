@@ -4,15 +4,14 @@ import type { AgentResponse, Item } from "../types";
 const won = (v?: number | null) => (v == null ? "-" : `${Math.round(v).toLocaleString("ko-KR")}원`);
 
 export function VolumePanel({ item, onCalc, result }: { item: Item; onCalc: (boxes: number) => void; result?: AgentResponse["tools"]["my_volume"] }) {
-  const [boxes, setBoxes] = useState<string>("");
+  const [boxes, setBoxes] = useState(() => result?.ok && result.boxes != null ? String(result.boxes) : "");
   const n = Number(boxes);
   return (
-    <section className="panel">
-      <h3>내 물량으로 계산</h3>
+    <div className="volume-panel">
       <div className="volume">
         <input type="number" inputMode="numeric" min={1} placeholder="0" value={boxes} onChange={(e) => setBoxes(e.target.value)} aria-label={`${item.unit.label} 수`} />
         <span>
-          {item.unit.label} (1{item.unit.label} = {item.unit.kg}kg)
+          {item.unit.label} (1{item.unit.label} {item.unit.kg}kg{item.unit.verify ? "" : " 가정"})
         </span>
         <button onClick={() => n > 0 && onCalc(n)} disabled={!(n > 0)}>
           계산하기
@@ -26,7 +25,7 @@ export function VolumePanel({ item, onCalc, result }: { item: Item; onCalc: (box
           <div className="scen">
             {Object.entries(result.revenue).map(([k, v]) => (
               <Fragment key={k}>
-                <span>{k} 기준</span>
+                <span>{k === "오늘 가격" ? "최근 거래 가격" : k} 기준</span>
                 <strong>{won(v)}</strong>
               </Fragment>
             ))}
@@ -34,7 +33,7 @@ export function VolumePanel({ item, onCalc, result }: { item: Item; onCalc: (box
           <p style={{ color: "var(--ink-soft)", fontSize: "0.85rem" }}>{result.note}</p>
         </div>
       )}
-    </section>
+    </div>
   );
 }
 

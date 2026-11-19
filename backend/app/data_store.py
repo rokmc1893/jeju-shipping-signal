@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import time
@@ -126,6 +127,19 @@ class DataStore:
     def __init__(self, root: Path | None = None):
         self.root = Path(root) if root else config.data_dir()
         self.root.mkdir(parents=True, exist_ok=True)
+
+    def collection_incomplete(self, cultivar: str) -> bool:
+        """기록이 있으면 해당 품종의 수집 완료 여부를 확인한다."""
+        try:
+            state = json.loads((self.root / "collect_state.json").read_text(encoding="utf-8"))
+            if state.get("version") != 1:
+                return True
+            entry = state["stats"].get(cultivar)
+            return entry is not None and (entry.get("status") != "ok" or entry.get("failed") != [])
+        except FileNotFoundError:
+            return False  # 상태 파일 도입 전의 캐시와 시연용 자료는 기록이 없다.
+        except (OSError, ValueError, KeyError, AttributeError, TypeError):
+            return True
 
     def path(self, dataset: str) -> Path:
         return self.root / f"{dataset}.csv"

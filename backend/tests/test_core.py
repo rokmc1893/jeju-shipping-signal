@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, timedelta
 
 import numpy as np
 import pandas as pd
 
 from app import tools
 from app.agent import Agent, AgentRequest
-from app.data_store import normalize, apply_closed_day_rule
+from app.data_store import DataStore, normalize, apply_closed_day_rule
 from app.intent import rule_extract, extract
 from app.judge import check_data_state, decide, GREEN, YELLOW, RED
 from app.llm import LLM
@@ -108,7 +108,8 @@ def test_signal_yellow_partial_and_low_confidence():
     assert decide(p, t, y, None, st).color == YELLOW
     p, t, y, st = _fake(5.0, "up", 10.0, conf="low")
     s = decide(p, t, y, None, st)
-    assert s.color == YELLOW and any("부족" in n for n in s.notes)
+    assert s.color == YELLOW and s.deferred and s.label == "판단 보류"
+    assert any("부족" in n for n in s.notes)
 
 
 def test_signal_exposes_condition_details():
@@ -160,7 +161,9 @@ def test_agent_button_path_full_overview(store):
     assert r.headline and len(r.bullets) == 3 and len(r.extra_sentences) >= 1
     assert set(r.tools) >= {"price_now", "trend_ma", "yoy_compare", "weather_effect"}
     assert "market_compare" not in r.tools   # 허브 1362 는 하루 10행 표본 → 기본 비활성화
-    assert any("LLM 호출 없음" in t for t in r.trace) and any("휴장" in t for t in r.trace)
+    assert any("LLM 호출 없음" in t for t in r.trace) and any("기준일 가격 자료 없음" in t for t in r.trace)
+    assert "상자" not in r.headline and "오늘" not in r.headline
+    assert not any("오늘 도매가" in line for line in r.bullets)
     assert any("산지 구분" in f for f in r.footnotes) and any("예측이 아니" in f for f in r.footnotes)
 
 
@@ -182,7 +185,42 @@ def test_agent_handles_missing_item_data(store):
 
 def test_agent_volume_sentence(store):
     r = _agent(store).run(AgentRequest(question="당근 50상자 있는데 얼마나 받아요", asof=SAT))
-    assert r.ok and r.tools["my_volume"]["ok"] and any("50상자" in s for s in r.extra_sentences)
+    assert r.ok and r.tools["my_volume"]["ok"] and any("50상자" in s and "가정한 예시" in s for s in r.extra_sentences)
+
+
+def test_reference_prices_across_observation_windows(tmp_path):
+    store = DataStore(tmp_path)
+    # 올해 30개 관측치, 작년 비교창 양 끝, 기준일 이후 행을 따로 구성한다.
+    key = "당근(일반)"
+    days = [(SAT - timedelta(days=29 - i), price)
+            for i, price in enumerate([1000] * 16 + [2000] * 7 + [3000] * 7)]
+    last_year = SUN.replace(year=SUN.year - 1)
+    days.extend([(last_year - timedelta(days=3), 1000), (last_year + timedelta(days=3), 2000),
+                 (last_year + timedelta(days=4), 9000), (SUN + timedelta(days=1), 9000)])
+    frame = pd.DataFrame([{"date": d, "price": v, "volume": 1, "cultivar": key} for d, v in days])
+    store.save("daily_stats", frame)
+    response = _agent(store).run(AgentRequest(item="carrot", asof=SUN))
+    p, trend, yoy = (response.tools[name] for name in ("price_now", "trend_ma", "yoy_compare"))
+    assert (p["date"], p["price_kg"]) == (SAT.isoformat(), 3000)
+    assert (trend["ma_short"], trend["ma_long"], trend["short_change_pct"]) == (3000, 1700, 50)
+    assert (yoy["last_year_days"], yoy["last_year_mean"], yoy["yoy_pct"]) == (2, 1500, 100)
+    assert response.signal["score"] == 3 and response.signal["color"] == GREEN
+
+    # 최신 자료를 지우고도 비교 기준일과 전년 자료는 동일하게 유지한다.
+    for age in (7, 8):
+        store.save("daily_stats", frame[frame["date"] <= SUN - timedelta(days=age)])
+        delayed = _agent(store).run(AgentRequest(item="carrot", asof=SUN))
+        assert delayed.tools["yoy_compare"]["ok"] is (age == 7)
+        if age == 8:
+            assert "8일 전" in delayed.headline
+            assert delayed.signal["color"] == YELLOW
+            assert "전년 비교를 보류" in delayed.signal["conditions"][-1]["detail"]
+
+    store.save("daily_stats", frame[frame["date"] > last_year + timedelta(days=4)])
+    missing = _agent(store).run(AgentRequest(item="carrot", asof=SUN))
+    assert missing.tools["price_now"]["price_kg"] == 3000
+    assert not missing.tools["yoy_compare"]["ok"]
+    assert missing.tools["yoy_compare"]["reason"] in missing.bullets
 
 
 def test_signal_counts_numpy_bools_from_real_tools(store):

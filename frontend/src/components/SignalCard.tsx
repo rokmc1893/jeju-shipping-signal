@@ -1,29 +1,43 @@
 import type { AgentResponse } from "../types";
+import { CropIcon } from "./CropIcon";
 
-const won = (v?: number | null) => (v == null ? "-" : `${Math.round(v).toLocaleString("ko-KR")}원`);
+const priceText = (value: number) => Math.round(value).toLocaleString("ko-KR");
 
-export function SignalCard({ r, unitLabel, unitKg }: { r: AgentResponse; unitLabel: string; unitKg: number }) {
+export function SignalCard({ r }: { r: AgentResponse }) {
   const s = r.signal!;
   const p = r.tools.price_now;
-  const unitPrice = p?.ok && p.price_kg != null ? p.price_kg * unitKg : null;
+  const change = p?.dod_pct;
   return (
     <section className="signal" aria-live="polite">
-      <div className={`lamp ${s.color}`} role="img" aria-label={`신호: ${s.label}`}>
-        {s.label}
+      <div className="signal-top">
+        <CropIcon crop={r.item ?? ""} />
+        <div>
+          <h2>{r.item_name}</h2>
+          {r.cultivar && <p className="cultivar">{r.cultivar}</p>}
+        </div>
       </div>
-      <div>
-        <h2>{r.headline}</h2>
-        <div className="price">
-          {won(unitPrice)}
-          <small>
-            1{unitLabel} ({unitKg}kg)
-          </small>
-        </div>
-        <div className="meta">
-          1kg {won(p?.price_kg)}
-          {p?.dod_pct != null && ` · 전 거래일보다 ${p.dod_pct > 0 ? "+" : ""}${p.dod_pct}%`}
-          {p?.date && ` · ${p.date} 거래 기준`}
-        </div>
+      <p className="price-label">전국 도매가격</p>
+      <p className="price">
+        {p?.price_kg != null ? `${priceText(p.price_kg)}원` : "가격 없음"}
+        {p?.price_kg != null && <small> / kg</small>}
+      </p>
+      <dl className="price-facts">
+        {p?.date && (
+          <div>
+            <dt>마지막 거래</dt>
+            <dd className="meta"><time dateTime={p.date}>{p.date}</time></dd>
+          </div>
+        )}
+        {change != null && (
+          <div>
+            <dt>전 거래일보다</dt>
+            <dd>{change === 0 ? "같아요" : `${Math.abs(change).toFixed(1)}% ${change > 0 ? "높아요" : "낮아요"}`}</dd>
+          </div>
+        )}
+      </dl>
+      <div className={`signal-status signal-status--${s.deferred ? "deferred" : s.color}`}>
+        <strong>{s.label}</strong>
+        <p>{r.headline}</p>
       </div>
     </section>
   );
@@ -32,29 +46,27 @@ export function SignalCard({ r, unitLabel, unitKg }: { r: AgentResponse; unitLab
 export function WhyThisColor({ r }: { r: AgentResponse }) {
   const s = r.signal!;
   return (
-    <details className="why">
-      <summary>왜 이 색인가요? — 3가지 중 {s.score}가지 해당</summary>
-      {s.conditions.map((c) => (
-        <div className="cond" key={c.key}>
-          <span className={`mark ${c.met === null ? "na" : c.met ? "ok" : "no"}`} aria-hidden="true">
-            {c.met === null ? "?" : c.met ? "○" : "×"}
-          </span>
-          <div>
-            <div>{c.label}</div>
-            <div className="detail">{c.detail}</div>
-          </div>
-        </div>
-      ))}
-      {s.notes.length > 0 && (
-        <ul className="notes">
-          {s.notes.map((n, i) => (
-            <li key={i}>{n}</li>
+    <details className="disclosure why">
+      <summary>{s.deferred ? "보류한 이유 보기" : "판단 이유 보기"}</summary>
+      <div className="disclosure-body">
+        {!s.deferred && <p className="detail">세 가지 조건 중 {s.score}가지가 해당해요.</p>}
+        <ul className="conditions">
+          {s.conditions.map((c) => (
+            <li className="cond" key={c.key}>
+              <strong>{c.label}</strong>
+              <span className={`condition-label ${c.met === null ? "na" : c.met ? "ok" : "no"}`}>
+                {c.met === null ? "비교 불가" : c.met ? "해당" : "해당 없음"}
+              </span>
+              <p className="detail">{c.detail}</p>
+            </li>
           ))}
         </ul>
-      )}
-      <p className="detail" style={{ marginTop: "0.6rem" }}>
-        초록 = 3가지 모두 해당 · 노랑 = 1~2가지 · 빨강 = 하나도 없음. 자료가 부족하면 노랑으로 표시해요.
-      </p>
+        {s.notes.length > 0 && (
+          <ul className="notes">
+            {s.notes.map((n, i) => <li key={i}>{n}</li>)}
+          </ul>
+        )}
+      </div>
     </details>
   );
 }
