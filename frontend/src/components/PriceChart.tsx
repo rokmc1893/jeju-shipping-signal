@@ -40,7 +40,7 @@ export function PriceChart({ thisYear, lastYear }: { thisYear: SeriesPoint[]; la
               labelFormatter={(i) => `기간 내 ${Number(i) + 1}번째 거래일`}
             />
             <Line type="monotone" dataKey="작년" stroke="#537552" strokeDasharray="5 4" strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
-            <Line type="monotone" dataKey="올해" stroke="#0b5971" strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />
+            <Line type="monotone" dataKey="올해" stroke="var(--sea)" strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>

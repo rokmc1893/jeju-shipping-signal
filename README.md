@@ -155,6 +155,6 @@ npm --prefix frontend audit --audit-level=moderate
 
 선택 가능한 LLM은 OpenAI 호환 API 또는 Ollama다. `LLM_PROVIDER=none`이 기본이며 버튼 조회에는 모델이 필요 없다. 모델명과 실제 사용 범위는 제출 시 실행 설정에 맞춰 기록한다. 생성 설명은 프롬프트로 제한하지만 숫자·문장 일치의 사후 검증은 아직 구현하지 않았다.
 
-주요 라이브러리는 pandas, NumPy, PyYAML, FastAPI, Uvicorn, Pydantic, React, TypeScript, Recharts, Vite다. 개발 검증에는 pytest와 httpx를 사용한다. 코드 작성·검토와 문서 정리에 Claude·Codex의 도움을 사용했다.
+주요 라이브러리는 pandas, NumPy, PyYAML, FastAPI, Uvicorn, Pydantic, React, TypeScript, Recharts, Vite다. 개발 검증에는 pytest와 httpx를 사용한다. 코드 작성·검토와 문서 정리에 Claude·Codex의 도움을 사용했다. 화면의 채소 그림 5종은 OpenAI 이미지 생성 도구로 제작해 앱에 포함했다.
 
 대회 인계 문서에 기재된 결과물 권리 조건이 있어 임의의 오픈소스 라이선스를 부여하지 않았다. 공개 저장소라는 사실만으로 소스·데이터의 재배포 권한을 뜻하지 않는다.
