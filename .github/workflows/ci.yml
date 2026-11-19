@@ -70,3 +70,32 @@ jobs:
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - run: ./gradlew :app:assembleDebug
         working-directory: frontend/android
+
+  windows-start:
+    name: Windows 새 폴더에서 설치·조회·재시작
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 정적 화면 빌드
+        run: |
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run build
+        working-directory: frontend
+      - name: 새 개발 폴더에서 start.bat 실행
+        run: |
+          $fresh = Join-Path $env:RUNNER_TEMP 'Jeju clean start'
+          New-Item -ItemType Directory -Path $fresh | Out-Null
+          Copy-Item -Recurse backend, config, scripts, start.bat, requirements.txt, .env.example $fresh
+          New-Item -ItemType Directory -Path (Join-Path $fresh 'frontend') | Out-Null
+          Copy-Item -Recurse frontend/dist (Join-Path $fresh 'frontend')
+          Push-Location $fresh
+          python scripts/check_local_start.py --sample
+          exit $LASTEXITCODE
