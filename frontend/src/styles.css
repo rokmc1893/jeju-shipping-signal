@@ -9,7 +9,7 @@
   --red: #c9412f;
   --blue: #2f5fa3;
   --radius: 14px;
-  --font: "Pretendard Variable", Pretendard, -apple-system, "Malgun Gothic", sans-serif;
+  --font: -apple-system, "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
   font-size: 20px;
 }
 html[data-big="1"] { font-size: 25px; }
@@ -91,6 +91,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--blue); outl
 .lamp.green { background: var(--green); }
 .lamp.yellow { background: var(--yellow); color: #3a2a00; }
 .lamp.red { background: var(--red); }
+.lamp.deferred { background: #e7e8e5; color: #333a30; }
 .signal h2 { margin: 0 0 0.4rem; font-size: 1.55rem; font-weight: 800; line-height: 1.25; letter-spacing: -0.015em; }
 .signal .price { font-size: 2.8rem; font-weight: 900; letter-spacing: -0.03em; line-height: 1; margin: 0.2rem 0; }
 .signal .price small { font-size: 1rem; font-weight: 600; color: var(--ink-soft); margin-left: 0.4rem; }

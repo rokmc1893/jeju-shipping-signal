@@ -25,12 +25,15 @@ export default function App() {
   const [res, setRes] = useState<AgentResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [connectionError, setConnectionError] = useState(false);
+  const [requestFailed, setRequestFailed] = useState(false);
   const [big, setBig] = useState(() => safeGet("big") === "1");
   const [kiosk, setKiosk] = useState(() => safeGet("kiosk") === "1");
   const [listening, setListening] = useState(false);
   const idleTimer = useRef<number | null>(null);
   const stopListen = useRef<(() => void) | null>(null);
   const requestId = useRef(0);
+  const lastRequest = useRef<Parameters<typeof ask>[0] | null>(null);
   const resultElement = useRef<HTMLElement | null>(null);
   const scrollToResult = useRef(false);
 
@@ -41,10 +44,18 @@ export default function App() {
     resultElement.current?.scrollIntoView({ behavior: reducedMotion ? "instant" : "smooth", block: "start" });
   }, [res]);
 
-  useEffect(() => {
-    fetchHealth().then((health) => setSynthetic(health.synthetic)).catch(() => {});
-    fetchItems().then(setItems).catch(() => setError("서버에 연결할 수 없어요. 실행 창이 열려 있는지 확인해 주세요."));
+  const loadItems = useCallback(async () => {
+    setConnectionError(false);
+    try {
+      const [health, list] = await Promise.all([fetchHealth(), fetchItems()]);
+      setSynthetic(health.synthetic);
+      setItems(list);
+    } catch {
+      setConnectionError(true);
+    }
   }, []);
+
+  useEffect(() => { void loadItems(); }, [loadItems]);
 
   useEffect(() => {
     document.documentElement.dataset.big = big ? "1" : "0";
@@ -66,6 +77,10 @@ export default function App() {
         setRes(null);
         setSelected(null);
         setQuestion("");
+        setIntent("overview");
+        setError(null);
+        setRequestFailed(false);
+        lastRequest.current = null;
         stopSpeaking();
         stopListen.current?.();
         setListening(false);
@@ -82,17 +97,20 @@ export default function App() {
 
   const run = useCallback(async (params: Parameters<typeof ask>[0]) => {
     const id = ++requestId.current;
+    lastRequest.current = params;
     setLoading(true);
+    setRes(null);
     setError(null);
+    setRequestFailed(false);
     try {
       const r = await ask(params);
       if (id !== requestId.current) return;
       scrollToResult.current = !params.intents?.includes("volume") && !r.tools.my_volume;
       setRes(r);
-      if (r.item) setSelected(r.item);
-    } catch (e) {
+      setSelected(r.item);
+    } catch {
       if (id !== requestId.current) return;
-      setError(e instanceof Error ? e.message : "알 수 없는 오류가 났어요.");
+      setRequestFailed(true);
     } finally {
       if (id === requestId.current) setLoading(false);
     }
@@ -108,7 +126,16 @@ export default function App() {
     const t = q.trim();
     if (!t) return;
     setQuestion(t);
+    setSelected(null);
     void run({ question: t });
+  };
+
+  const clarifyItem = (key: string) => {
+    const resolved = res?.intent;
+    const intents = resolved?.intents.length ? resolved.intents : ["overview" as const];
+    setSelected(key);
+    setIntent(intents[0]);
+    void run({ item: key, intents, boxes: resolved?.boxes ?? undefined });
   };
 
   const toggleListen = () => {
@@ -173,6 +200,12 @@ export default function App() {
         </button>
       </header>
 
+      {connectionError && (
+        <div className="error" role="alert">
+          서버에 연결할 수 없어요. 실행 창을 확인해 주세요.{" "}
+          <button className="chip" onClick={() => void loadItems()}>연결 다시 시도</button>
+        </div>
+      )}
       {synthetic && <div className="error" role="status">시연용 합성 자료입니다. 실제 시세가 아니며 출하 판단에 사용하면 안 됩니다.</div>}
       <main className="main">
         <aside>
@@ -180,7 +213,7 @@ export default function App() {
             {items.map((i) => (
               <button key={i.key} className="item-btn" aria-pressed={selected === i.key} disabled={!i.has_data} onClick={() => pickItem(i.key)}>
                 {i.name}
-                <small>{i.has_data ? `${i.region} · 원/kg` : "자료 준비 중"}</small>
+                <small>{i.has_data ? (i.collection_incomplete ? "수집 미완료" : "전국 도매 · 원/kg") : "자료 준비 중"}</small>
               </button>
             ))}
           </nav>
@@ -197,7 +230,7 @@ export default function App() {
                 {listening ? "듣는 중" : "말하기"}
               </button>
             )}
-            <button type="submit" disabled={loading}>
+            <button type="submit" disabled={loading || connectionError || items.length === 0}>
               묻기
             </button>
           </form>
@@ -213,15 +246,21 @@ export default function App() {
         <section className="result" aria-busy={loading} ref={resultElement}>
           {error && <div className="error" role="alert">{error}</div>}
 
-          {!res && !loading && <div className="empty">작물을 고르면 최근 시세와 신호를 보여드려요.</div>}
-          {loading && <div className="empty">살펴보는 중…</div>}
+          {requestFailed && (
+            <div className="error" role="alert">
+              조회 응답을 받지 못했어요. 실행 창을 확인해 주세요.{" "}
+              <button className="chip" onClick={() => lastRequest.current && void run(lastRequest.current)}>조회 다시 시도</button>
+            </div>
+          )}
+          {!res && !loading && !connectionError && !requestFailed && <div className="empty">작물을 고르면 최근 시세와 신호를 보여드려요.</div>}
+          {loading && <div className="empty" role="status">{item ? `${item.name} 자료를 찾는 중…` : "살펴보는 중…"}</div>}
 
           {res && !res.ok && res.clarify.length > 0 && (
             <div className="panel">
               <h3>{res.headline}</h3>
               <div className="chips">
                 {res.clarify.map((c) => (
-                  <button key={c.item} className="chip" onClick={() => pickItem(c.item, "overview")}>
+                  <button key={c.item} className="chip" onClick={() => clarifyItem(c.item)}>
                     {c.label}
                   </button>
                 ))}
@@ -258,7 +297,9 @@ export default function App() {
               {res.tools.weather_effect && <WeatherPanel w={res.tools.weather_effect} />}
               {res.tools.market_compare && <MarketPanel m={res.tools.market_compare} />}
 
-              <VolumePanel item={item} result={res.tools.my_volume} onCalc={(boxes) => void run({ item: item.key, intents: ["volume"], boxes })} />
+              {!res.data_state?.collection_incomplete && (
+                <VolumePanel item={item} result={res.tools.my_volume} onCalc={(boxes) => void run({ item: item.key, intents: ["volume"], boxes })} />
+              )}
 
               <ul className="foot">
                 {res.footnotes.map((f, i) => (

@@ -127,6 +127,10 @@ class Agent:
 
         cfg, cv, stats, trades, weather = self._load(it.item, it.cultivar, trace)
         state = check_data_state(stats, asof)
+        state.collection_incomplete = self.store.collection_incomplete(cv)
+        incomplete_reason = "이 품종의 자료 수집이 완료되지 않아 비교와 판단을 보류해요."
+        if state.collection_incomplete:
+            state.warnings.append(incomplete_reason)
         trace.append(f"데이터 상태: 거래일 {state.trading_days_30}/30일, 신뢰도={state.confidence}, 마지막 거래일={state.last_trading_day}")
         if not state.ok:
             return AgentResponse(False, mode, it.item, cfg["name"], cv, asof.isoformat(), None,
@@ -148,18 +152,25 @@ class Agent:
         res["price_now"] = tools.price_now(stats, asof)
         if res["price_now"].get("is_asof_closed"):
             trace.append(f"기준일 가격 자료 없음 → 마지막 거래일 {res['price_now']['date']} 기준으로 전환")
-        res["trend_ma"] = tools.trend_ma(stats, asof)
-        res["yoy_compare"] = tools.yoy_compare(stats, asof)
-        if "weather_effect" in plan:
-            res["weather_effect"] = tools.weather_effect(stats, weather, asof)
-        if "market_compare" in plan:
-            res["market_compare"] = tools.market_compare(trades, asof)
-        if "my_volume" in plan:
-            res["my_volume"] = tools.my_volume(res["price_now"], res["trend_ma"], res["yoy_compare"],
-                                               it.boxes or 0, cfg["unit"]["kg"], cfg["unit"]["label"])
-            if res["my_volume"].get("ok") and not cfg["unit"].get("verify"):
-                res["my_volume"]["note"] = (f"1{cfg['unit']['label']} {cfg['unit']['kg']}kg을 가정한 예시예요. "
-                                             + res["my_volume"]["note"])
+        if state.collection_incomplete:
+            # 마지막 관측값은 제시하되, 누락 구간에 의존할 수 있는 파생값은 보류한다.
+            res["price_now"].update(prev_date=None, dod_pct=None)
+            for tool in plan:
+                if tool != "price_now":
+                    res[tool] = {"ok": False, "reason": incomplete_reason}
+        else:
+            res["trend_ma"] = tools.trend_ma(stats, asof)
+            res["yoy_compare"] = tools.yoy_compare(stats, asof)
+            if "weather_effect" in plan:
+                res["weather_effect"] = tools.weather_effect(stats, weather, asof)
+            if "market_compare" in plan:
+                res["market_compare"] = tools.market_compare(trades, asof)
+            if "my_volume" in plan:
+                res["my_volume"] = tools.my_volume(res["price_now"], res["trend_ma"], res["yoy_compare"],
+                                                   it.boxes or 0, cfg["unit"]["kg"], cfg["unit"]["label"])
+                if res["my_volume"].get("ok") and not cfg["unit"].get("verify"):
+                    res["my_volume"]["note"] = (f"1{cfg['unit']['label']} {cfg['unit']['kg']}kg을 가정한 예시예요. "
+                                                 + res["my_volume"]["note"])
         for k, v in res.items():
             if not v.get("ok"):
                 trace.append(f"{k}: {v.get('reason')}")
@@ -171,7 +182,9 @@ class Agent:
         if res["price_now"].get("ok") and cfg["unit"].get("verify"):
             unit_price = res["price_now"]["price_kg"] * cfg["unit"]["kg"]
         head = templates.headline(cfg["name"], cfg["unit"]["label"], unit_price, signal)
-        if (state.days_since_last or 0) > config.MAX_PRICE_AGE_DAYS:
+        if state.collection_incomplete:
+            head = f"{cfg['name']}, 아직 수집이 끝나지 않았어요."
+        elif (state.days_since_last or 0) > config.MAX_PRICE_AGE_DAYS:
             head = f"{cfg['name']}, 마지막 거래가 {state.days_since_last}일 전이라 판단을 보류해요."
         bl = templates.bullets(res["price_now"], res["trend_ma"], res["yoy_compare"], cfg["name"])
         if not res["yoy_compare"].get("ok"):

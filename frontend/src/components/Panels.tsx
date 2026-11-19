@@ -4,7 +4,7 @@ import type { AgentResponse, Item } from "../types";
 const won = (v?: number | null) => (v == null ? "-" : `${Math.round(v).toLocaleString("ko-KR")}원`);
 
 export function VolumePanel({ item, onCalc, result }: { item: Item; onCalc: (boxes: number) => void; result?: AgentResponse["tools"]["my_volume"] }) {
-  const [boxes, setBoxes] = useState<string>("");
+  const [boxes, setBoxes] = useState(() => result?.ok && result.boxes != null ? String(result.boxes) : "");
   const n = Number(boxes);
   return (
     <section className="panel">

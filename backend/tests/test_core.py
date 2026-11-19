@@ -108,7 +108,8 @@ def test_signal_yellow_partial_and_low_confidence():
     assert decide(p, t, y, None, st).color == YELLOW
     p, t, y, st = _fake(5.0, "up", 10.0, conf="low")
     s = decide(p, t, y, None, st)
-    assert s.color == YELLOW and any("부족" in n for n in s.notes)
+    assert s.color == YELLOW and s.deferred and s.label == "판단 보류"
+    assert any("부족" in n for n in s.notes)
 
 
 def test_signal_exposes_condition_details():

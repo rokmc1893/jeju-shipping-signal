@@ -7,7 +7,7 @@ export function SignalCard({ r }: { r: AgentResponse }) {
   const p = r.tools.price_now;
   return (
     <section className="signal" aria-live="polite">
-      <div className={`lamp ${s.color}`} role="img" aria-label={`신호: ${s.label}`}>
+      <div className={`lamp ${s.deferred ? "deferred" : s.color}`} role="img" aria-label={`신호: ${s.label}`}>
         {s.label}
       </div>
       <div>
@@ -32,7 +32,7 @@ export function WhyThisColor({ r }: { r: AgentResponse }) {
   const s = r.signal!;
   return (
     <details className="why">
-      <summary>왜 이 색인가요? — 3가지 중 {s.score}가지 해당</summary>
+      <summary>{s.deferred ? "왜 판단을 보류했나요?" : `왜 이 색인가요? · 3가지 중 ${s.score}가지 해당`}</summary>
       {s.conditions.map((c) => (
         <div className="cond" key={c.key}>
           <span className={`mark ${c.met === null ? "na" : c.met ? "ok" : "no"}`} aria-hidden="true">
@@ -52,7 +52,7 @@ export function WhyThisColor({ r }: { r: AgentResponse }) {
         </ul>
       )}
       <p className="detail" style={{ marginTop: "0.6rem" }}>
-        초록 = 3가지 모두 해당 · 노랑 = 1~2가지 · 빨강 = 하나도 없음. 자료가 부족하면 노랑으로 표시해요.
+        초록 = 3가지 모두 해당 · 노랑 = 1~2가지 · 빨강 = 하나도 없음. 자료가 부족하면 판단을 보류해요.
       </p>
     </details>
   );

@@ -63,6 +63,7 @@ def items():
     for key, it in config.items().items():
         out.append({"key": key, "name": it["name"], "cultivars": it["cultivars"]["all"], "default_cultivar": it["cultivars"]["default"],
                     "unit": it["unit"], "jeju_share": it["jeju_share"], "region": it["region"],
+                    "collection_incomplete": _store.collection_incomplete(it["cultivars"]["default"]),
                     "has_data": not _store.stats(it["cultivars"]["default"]).empty})
     return out
 

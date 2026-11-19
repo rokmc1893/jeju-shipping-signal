@@ -6,7 +6,8 @@ export function PriceChart({ thisYear, lastYear }: { thisYear: SeriesPoint[]; la
   const n = Math.max(thisYear.length, lastYear.length);
   const data = Array.from({ length: n }, (_, i) => ({
     i,
-    date: thisYear[i]?.date ?? "",
+    thisDate: thisYear[i]?.date,
+    lastDate: lastYear[i]?.date,
     올해: thisYear[i]?.price ?? null,
     작년: lastYear[i]?.price ?? null,
   }));
@@ -20,17 +21,23 @@ export function PriceChart({ thisYear, lastYear }: { thisYear: SeriesPoint[]; la
         <span>
           <i style={{ background: "#b8c2b0" }} />작년 같은 시기
         </span>
-        <span>단위: 원/kg · 거래일만</span>
+        <span>원/kg · 기간별 거래 순서로 나란히 표시</span>
       </div>
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid stroke="#e6ebe1" vertical={false} />
-            <XAxis dataKey="date" tick={{ fontSize: 12 }} tickFormatter={(d: string) => (d ? d.slice(5) : "")} minTickGap={28} />
+            <XAxis dataKey="i" tick={{ fontSize: 12 }} tickFormatter={(i: number) => `${i + 1}번째`} minTickGap={28} />
             <YAxis tick={{ fontSize: 12 }} tickFormatter={fmt} width={44} domain={["auto", "auto"]} />
             <Tooltip
-              formatter={(v, name) => [v == null || v === "" ? "-" : `${Math.round(Number(v)).toLocaleString("ko-KR")}원`, String(name)]}
-              labelFormatter={(l) => String(l ?? "")}
+              position={{ x: 0 }}
+              wrapperStyle={{ maxWidth: "100%" }}
+              contentStyle={{ whiteSpace: "normal" }}
+              formatter={(v, name, entry) => [
+                `${Math.round(Number(v)).toLocaleString("ko-KR")}원/kg`,
+                `${name} · ${name === "올해" ? entry.payload.thisDate : entry.payload.lastDate}`,
+              ]}
+              labelFormatter={(i) => `기간 내 ${Number(i) + 1}번째 거래일`}
             />
             <Line type="monotone" dataKey="작년" stroke="#b8c2b0" strokeWidth={2.5} dot={false} connectNulls isAnimationActive={false} />
             <Line type="monotone" dataKey="올해" stroke="#1e2a1c" strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />

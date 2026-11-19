@@ -2,6 +2,7 @@
 from datetime import date
 from types import SimpleNamespace
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -77,6 +78,32 @@ def test_api_full_flow_and_missing_data(client):
     missing = client.post("/api/ask", json={"item": "onion", "asof": "2026-11-08"})
     assert missing.status_code == 200 and not missing.json()["ok"]
     assert len(client.get("/api/briefing?asof=2026-11-08").json()["items"]) == 5
+
+
+def test_incomplete_collection_preserves_price_and_withholds_comparisons(client, store, monkeypatch, tmp_path):
+    from app.data_store import DataStore
+
+    isolated = DataStore(tmp_path)
+    isolated.save("daily_stats", store.load("daily_stats"))
+    monkeypatch.setattr(main, "_store", isolated)
+    monkeypatch.setattr(main, "_agent", Agent(isolated, main._agent.llm))
+    state = {"version": 1, "stats": {"당근(일반)": {"status": "partial", "failed": [{"start": "2026-11-01"}]}}}
+    path = tmp_path / "collect_state.json"
+    path.write_text(json.dumps(state), encoding="utf-8")
+
+    payload = {"item": "carrot", "asof": "2026-11-08", "intents": ["volume"], "boxes": 5}
+    item = next(i for i in client.get("/api/items").json() if i["key"] == "carrot")
+    result = client.post("/api/ask", json=payload).json()
+    assert item["has_data"] and item["collection_incomplete"]
+    assert result["tools"]["price_now"]["ok"]
+    assert result["signal"]["deferred"] and result["signal"]["label"] == "판단 보류"
+    assert not any(result["tools"][tool]["ok"] for tool in ("trend_ma", "yoy_compare", "my_volume"))
+
+    state["stats"]["당근(일반)"].update(status="ok", failed=[])
+    path.write_text(json.dumps(state), encoding="utf-8")
+    recovered = client.post("/api/ask", json=payload).json()
+    assert not recovered["data_state"]["collection_incomplete"]
+    assert recovered["tools"]["my_volume"]["ok"]
 
 
 def test_weather_stops_empty_station_without_skipping_other_station(store, monkeypatch):

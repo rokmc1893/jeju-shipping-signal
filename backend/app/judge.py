@@ -27,6 +27,7 @@ class DataState:
     first_date: str | None
     confidence: str                # high | mid | low | none
     warnings: list[str] = field(default_factory=list)
+    collection_incomplete: bool = False
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -78,6 +79,8 @@ class Signal:
     notes: list[str]
     confidence: str
 
+    deferred: bool = False
+
     def as_dict(self) -> dict:
         d = asdict(self)
         return d
@@ -124,18 +127,20 @@ def decide(price: dict, trend: dict, yoy: dict, weather: dict | None, state: Dat
         color = RED
     else:
         color = YELLOW
-    if state.confidence == "low" or unknown >= 2 or (state.days_since_last or 0) > config.MAX_PRICE_AGE_DAYS:
+    deferred = (state.collection_incomplete or state.confidence == "low" or unknown >= 2
+                or (state.days_since_last or 0) > config.MAX_PRICE_AGE_DAYS)
+    if deferred:
         color = YELLOW
-        notes.append("자료가 부족해 '관망'으로 표시했어요.")
+        notes.append("자료가 부족해 판단을 보류했어요.")
 
     # 보조 신호 (색은 안 바꾸고 메모만)
     r = config.rules()
     if trend.get("ok") and trend.get("volume_ratio") and trend["volume_ratio"] >= r["volume_spike_ratio"]:
-        notes.append(f"최근 거래일 거래량이 평소의 {trend['volume_ratio']:.1f}배예요. 출하가 몰리고 있어 가격이 눌릴 수 있어요.")
+        notes.append(f"최근 거래일 거래량이 평소의 {trend['volume_ratio']:.1f}배였어요.")
     if weather and weather.get("ok"):
         if weather.get("recent_cold_day") and weather["cold"].get("enough"):
             notes.append(f"최근 일주일 안에 한파일이 있었어요. 과거엔 한파 뒤 {weather['after_days']}거래일 가격이 평소보다 {weather['cold']['change_pct']:+.1f}%였어요.")
         if weather.get("recent_rain_day") and weather["rain"].get("enough"):
             notes.append(f"최근 일주일 안에 비가 많이 온 날이 있었어요. 과거엔 비 온 뒤 가격이 평소보다 {weather['rain']['change_pct']:+.1f}%였어요.")
     notes.extend(state.warnings)
-    return Signal(color, LABEL[color], met, conds, notes, state.confidence)
+    return Signal(color, "판단 보류" if deferred else LABEL[color], met, conds, notes, state.confidence, deferred)

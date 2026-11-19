@@ -9,9 +9,11 @@ def won(v: float | None) -> str:
 
 
 def headline(item_name: str, unit_label: str, unit_price: float | None, signal: Signal) -> str:
-    base = {GREEN: f"{item_name}, 지금은 출하를 생각해 볼 만해요.",
-            YELLOW: f"{item_name}, 조금 더 지켜보는 게 좋겠어요.",
-            RED: f"{item_name}, 지금 출하는 조심하세요."}[signal.color]
+    if signal.deferred:
+        return f"{item_name}, 자료가 부족해 판단을 보류해요."
+    base = {GREEN: f"{item_name}, 세 가지 시세 조건을 모두 충족했어요.",
+            YELLOW: f"{item_name}, 시세 조건이 엇갈려요.",
+            RED: f"{item_name}, 충족한 시세 조건이 없어요."}[signal.color]
     if unit_price is not None:
         base += f" 최근 거래일 1{unit_label} {won(unit_price)}쯤이에요."
     return base
